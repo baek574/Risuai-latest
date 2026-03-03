@@ -11,4 +11,4 @@ services:
     ports:
       - "6002:6001" # 외부 6002를 컨테이너 내부 6001로 연결
     volumes:
-      - /volume2/docker/risusave-latest:/app/save # 절대 경로를 직접 매핑
+      - /volume2/docker/risu-latest:/app/save # 절대 경로를 직접 매핑
