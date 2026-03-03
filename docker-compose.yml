@@ -6,7 +6,7 @@ services:
     build: .
     restart: always
     ports:
-      - 6001:6001
+      - 6002:6002
 volumes:
   risuai-save:
       - /volume2/docker/risusave:/app/save
