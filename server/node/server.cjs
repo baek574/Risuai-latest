@@ -175,12 +175,29 @@ async function checkAuth(req, res, returnOnlyStatus = false){
     }
 }
 
+const githubOAuthExemptPaths = [
+    '/login/device/code',
+    '/login/oauth/access_token'
+];
+
+function isGithubOAuthExemptUrl(urlParam) {
+    if (!urlParam) return false;
+    try {
+        const parsed = new URL(urlParam);
+        return parsed.hostname === 'github.com' && githubOAuthExemptPaths.includes(parsed.pathname);
+    } catch {
+        return false;
+    }
+}
+
 const reverseProxyFunc = async (req, res, next) => {
-    if(!await checkAuth(req, res)){
+    const urlParam = req.headers['risu-url'] ? decodeURIComponent(req.headers['risu-url']) : req.query.url;
+
+    const isGithubOAuthExempt = isGithubOAuthExemptUrl(urlParam);
+
+    if(!isGithubOAuthExempt && !await checkAuth(req, res)){
         return;
     }
-    
-    const urlParam = req.headers['risu-url'] ? decodeURIComponent(req.headers['risu-url']) : req.query.url;
 
     if (!urlParam) {
         res.status(400).send({
@@ -241,11 +258,13 @@ const reverseProxyFunc = async (req, res, next) => {
 }
 
 const reverseProxyFunc_get = async (req, res, next) => {
-    if(!await checkAuth(req, res)){
+    const urlParam = req.headers['risu-url'] ? decodeURIComponent(req.headers['risu-url']) : req.query.url;
+
+    const isGithubOAuthExempt = isGithubOAuthExemptUrl(urlParam);
+
+    if(!isGithubOAuthExempt && !await checkAuth(req, res)){
         return;
     }
-    
-    const urlParam = req.headers['risu-url'] ? decodeURIComponent(req.headers['risu-url']) : req.query.url;
 
     if (!urlParam) {
         res.status(400).send({
