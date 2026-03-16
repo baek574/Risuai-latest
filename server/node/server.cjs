@@ -180,11 +180,28 @@ const githubOAuthExemptPaths = [
     '/login/oauth/access_token'
 ];
 
-function isGithubOAuthExemptUrl(urlParam) {
+function isGithubExemptUrl(urlParam) {
     if (!urlParam) return false;
     try {
         const parsed = new URL(urlParam);
-        return parsed.hostname === 'github.com' && githubOAuthExemptPaths.includes(parsed.pathname);
+        const hostname = parsed.hostname;
+
+        // GitHub OAuth device flow / access token
+        if (hostname === 'github.com' && githubOAuthExemptPaths.includes(parsed.pathname)) {
+            return true;
+        }
+
+        // GitHub API (used by Copilot plugins for user info, token exchange, etc.)
+        if (hostname === 'api.github.com') {
+            return true;
+        }
+
+        // GitHub Copilot API endpoints (e.g., api.individual.githubcopilot.com)
+        if (hostname.endsWith('.githubcopilot.com') || hostname === 'githubcopilot.com') {
+            return true;
+        }
+
+        return false;
     } catch {
         return false;
     }
@@ -193,9 +210,9 @@ function isGithubOAuthExemptUrl(urlParam) {
 const reverseProxyFunc = async (req, res, next) => {
     const urlParam = req.headers['risu-url'] ? decodeURIComponent(req.headers['risu-url']) : req.query.url;
 
-    const isGithubOAuthExempt = isGithubOAuthExemptUrl(urlParam);
+    const isGithubExempt = isGithubExemptUrl(urlParam);
 
-    if(!isGithubOAuthExempt && !await checkAuth(req, res)){
+    if(!isGithubExempt && !await checkAuth(req, res)){
         return;
     }
 
@@ -260,9 +277,9 @@ const reverseProxyFunc = async (req, res, next) => {
 const reverseProxyFunc_get = async (req, res, next) => {
     const urlParam = req.headers['risu-url'] ? decodeURIComponent(req.headers['risu-url']) : req.query.url;
 
-    const isGithubOAuthExempt = isGithubOAuthExemptUrl(urlParam);
+    const isGithubExempt = isGithubExemptUrl(urlParam);
 
-    if(!isGithubOAuthExempt && !await checkAuth(req, res)){
+    if(!isGithubExempt && !await checkAuth(req, res)){
         return;
     }
 
