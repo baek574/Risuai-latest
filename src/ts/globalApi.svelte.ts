@@ -1606,6 +1606,33 @@ export async function fetchNative(url: string, arg: {
             status: r.status
         })
     }
+    else if (isNodeServer) {
+        const proxyHeaders: Record<string, string> = {
+            "risu-header": encodeURIComponent(JSON.stringify(headers)),
+            "risu-url": encodeURIComponent(url),
+            "Content-Type": "application/json",
+        };
+        if (arg.useRisuTk) {
+            proxyHeaders["x-risu-tk"] = "use";
+        }
+        const auth = localStorage.getItem('risuauth');
+        if (auth) {
+            proxyHeaders["risu-auth"] = auth;
+        }
+        if (DBState?.db?.requestLocation) {
+            proxyHeaders["risu-location"] = DBState.db.requestLocation;
+        }
+        const r = await fetch(`/proxy2`, {
+            body: realBody as any,
+            headers: proxyHeaders,
+            method: arg.method,
+            signal: arg.signal,
+        });
+        return new Response(pipeFetchLog(fetchLogIndex, r.body), {
+            headers: r.headers,
+            status: r.status,
+        });
+    }
     else {
         return await fetch(url, {
             body: realBody as any,
