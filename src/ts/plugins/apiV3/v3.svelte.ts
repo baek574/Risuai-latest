@@ -1,4 +1,4 @@
-import { allowedDbKeys, customProviderStore, getV2PluginAPIs, pluginV2, type PluginV2ProviderArgument, type PluginV2ProviderOptions, type RisuPlugin } from "../plugins.svelte";
+import { allowedDbKeys, customProviderStore, getV2PluginAPIs, handlePluginInstallViaPlugin, pluginV2, type PluginV2ProviderArgument, type PluginV2ProviderOptions, type RisuPlugin } from "../plugins.svelte";
 import { SandboxHost } from "./factory";
 import { getDatabase } from "src/ts/storage/database.svelte";
 import { SafeLocalPluginStorage, tagWhitelist } from "../pluginSafeClass";
@@ -9,6 +9,7 @@ import { sleep } from "src/ts/util";
 import { alertConfirm, alertError, alertNormal } from "src/ts/alert";
 import { language } from "src/lang";
 import { checkCharOrder, forageStorage, getFetchLogs } from "src/ts/globalApi.svelte";
+import { changeColorScheme, updateColorScheme, updateTextThemeAndCSS, type ColorScheme } from "src/ts/gui/colorscheme";
 import { isNodeServer, isTauri } from "src/ts/platform";
 import { get } from "svelte/store";
 import { registerMCPModule, unregisterMCPModule } from "src/ts/process/mcp/pluginmcp";
@@ -277,6 +278,7 @@ class SafeElement {
                     type: event.type,
                     key: event.key,
                     code: event.code,
+                    repeat: event.repeat,
                     altKey: event.altKey,
                     ctrlKey: event.ctrlKey,
                     shiftKey: event.shiftKey,
@@ -586,6 +588,12 @@ const urlBlacklist = [
     'sionyw.com',
 ]
 
+const authorizationHeaders = [
+    'x-api-key',
+    'authorization',
+    'proxy-authorization',
+]
+
 const makeRisuaiAPIV3 = (iframe:HTMLIFrameElement,plugin:RisuPlugin) => {
 
     const oldApis = getV2PluginAPIs();
@@ -593,9 +601,18 @@ const makeRisuaiAPIV3 = (iframe:HTMLIFrameElement,plugin:RisuPlugin) => {
 
         //Old APIs from v2.1
         risuFetch: (url, options) => {
+            console.error(`[DEPRECATION WARNING] risuFetch is deprecated and will be removed in future versions. Please use nativeFetch instead.`)
             for(const blocked of urlBlacklist){
                 if(url.toLowerCase().includes(blocked)){
                     throw new Error(`Requests to ${blocked} are blocked for security reasons.`);
+                }
+            }
+
+            //scan headers
+            const headers = options?.headers || {};
+            for(const headerName in headers){
+                if(authorizationHeaders.includes(headerName.toLowerCase())){
+                    console.warn(`Request contains potentially sensitive header '${headerName}'. handling of such headers may be changed to only work with nativeFetch.`);
                 }
             }
             return oldApis.risuFetch(url, options);
@@ -606,12 +623,20 @@ const makeRisuaiAPIV3 = (iframe:HTMLIFrameElement,plugin:RisuPlugin) => {
                     throw new Error(`Requests to ${blocked} are blocked for security reasons.`);
                 }
             }
+
+            //scan headers
+            const headers = options?.headers || {};
+            for(const headerName in headers){
+                if(authorizationHeaders.includes(headerName.toLowerCase())){
+                    console.warn(`Request contains potentially sensitive header '${headerName}'. handling of such headers may be changed to use server-side approch with write-only api access in the future for better security.`);
+                }
+            }
             return oldApis.nativeFetch(url, options);
         },
         getChar: oldApis.getChar,
         setChar: oldApis.setChar,
         addProvider: (name: string, func: (arg: PluginV2ProviderArgument, abortSignal?: AbortSignal) => Promise<{ success: boolean, content: string }>, options?: PluginV3ProviderOptions) => {
-            console.warn(`addProvider is a powerful API that can potentially be unsafe if used incorrectly. addProvider's functionality might be limited or changed in future updates to ensure security. please use other APIs if possible.`);
+            console.warn(`[WARN] addProvider is a powerful API that can potentially be unsafe if used incorrectly. addProvider's functionality might be limited or changed in future updates to ensure security. please use other APIs if possible.`);
             let provs = get(customProviderStore)
             provs.push(name)
             pluginV2.providers.set(name, async (arg, abortSignal) => {
@@ -671,7 +696,71 @@ const makeRisuaiAPIV3 = (iframe:HTMLIFrameElement,plugin:RisuPlugin) => {
             return liteDB;
         },
 
-        
+        installPlugin: handlePluginInstallViaPlugin,
+
+        // --- Color Scheme APIs ---
+        changeColorScheme: (name: string) => {
+            changeColorScheme(name)
+        },
+        setColorScheme: (scheme: ColorScheme) => {
+            const requiredKeys = ['bgcolor','darkbg','borderc','selected','draculared','textcolor','textcolor2','darkBorderc','darkbutton','type'] as const
+            for (const key of requiredKeys) {
+                if (typeof (scheme as any)[key] !== 'string') {
+                    throw new Error(`Invalid color scheme: missing or invalid '${key}'`)
+                }
+            }
+            if (scheme.type !== 'light' && scheme.type !== 'dark') {
+                throw new Error('Invalid color scheme type: must be "light" or "dark"')
+            }
+            const db = DBState.db
+            db.colorSchemeName = 'custom'
+            db.colorScheme = scheme
+            updateColorScheme()
+        },
+        getColorScheme: () => {
+            const db = DBState.db
+            return {
+                name: db.colorSchemeName,
+                scheme: $state.snapshot(db.colorScheme)
+            }
+        },
+
+        // --- Text Theme APIs ---
+        changeTextTheme: (name: string) => {
+            if (!['standard','highcontrast'].includes(name)) {
+                throw new Error(`Invalid text theme: ${name}`)
+            }
+            const db = DBState.db
+            db.textTheme = name
+            updateTextThemeAndCSS()
+        },
+        setCustomTextTheme: (theme: {
+            FontColorStandard: string,
+            FontColorBold: string,
+            FontColorItalic: string,
+            FontColorItalicBold: string,
+            FontColorQuote1: string,
+            FontColorQuote2: string
+        }) => {
+            const requiredKeys = ['FontColorStandard','FontColorBold','FontColorItalic','FontColorItalicBold','FontColorQuote1','FontColorQuote2'] as const
+            for (const key of requiredKeys) {
+                if (typeof (theme as any)[key] !== 'string') {
+                    throw new Error(`Invalid text theme: missing or invalid '${key}'`)
+                }
+            }
+            const db = DBState.db
+            db.textTheme = 'custom'
+            db.customTextTheme = theme
+            updateTextThemeAndCSS()
+        },
+        getTextTheme: () => {
+            const db = DBState.db
+            return {
+                name: db.textTheme,
+                customTheme: $state.snapshot(db.customTextTheme)
+            }
+        },
+
         //Deprecated APIs from v2.1
         //Use getArgument / setArgument instead if possible
         getArg: oldApis.getArg,
@@ -1027,10 +1116,38 @@ const makeRisuaiAPIV3 = (iframe:HTMLIFrameElement,plugin:RisuPlugin) => {
             pluginChannel.set(plugin.name + channelName, callback);
         },
         postPluginChannelMessage: (pluginName: string, channelName: string, message: any) => {
+
+            const currentPluginName = plugin.name;
+            const receiverPlugin = DBState.db.plugins.find(p => p.name === pluginName);
+
+            if(!receiverPlugin){
+                console.warn(`[RisuAI Plugin: ${currentPluginName}] Attempted to send message to non-existent plugin '${pluginName}' on channel '${channelName}'.`);
+                return;
+            }
+
+            if(!receiverPlugin.allowedIPC?.includes(pluginName)){
+                console.warn(`[RisuAI Plugin: ${currentPluginName}] Attempted to send message to plugin '${pluginName}' but receiver plugin does not allow IPC communication from this plugin. declare //@allowed-ipc ${currentPluginName} in the reciver plugin script to allow IPC communication.`);
+                return;
+            }
+
+            if(!plugin.allowedIPC?.includes(receiverPlugin.name)){
+                console.warn(`[RisuAI Plugin: ${currentPluginName}] Attempted to send message to plugin '${pluginName}' but the sender plugin does not allow IPC communication to this plugin. declare //@allowed-ipc ${receiverPlugin.name} in the sender plugin script to allow IPC communication.`);
+                return;
+            }
+
+
             const callback = pluginChannel.get(pluginName + channelName);
             if(callback){
-                callback(message);
+                callback(message, {
+                    sender: currentPluginName,
+                    channel: channelName
+                });
             }
+        },
+        saveSecretHeader: async (key: string, value: string|string[]) => {
+            //TODO: Implement server-side secret storage with write-only access for plugins, to enhance security when handling sensitive information like API keys.
+            //This will have rate-limit, to prevent saving it publicly and writing as secret every time before using it.
+            console.warn(`[RisuAI Plugin: ${plugin.name}] saveServerSecret is not implemented yet. This API is intended for securely storing sensitive information like API keys with write-only access for plugins. Please avoid using this API until it is implemented.`);
         }
     }
 }
