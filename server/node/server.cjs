@@ -227,7 +227,7 @@ const reverseProxyFunc = async (req, res, next) => {
         originalResponse = await fetch(urlParam, {
             method: req.method,
             headers: header,
-            body: JSON.stringify(req.body)
+            body: typeof req.body === 'string' ? req.body : JSON.stringify(req.body)
         });
         // get response body as stream
         const originalBody = originalResponse.body;
