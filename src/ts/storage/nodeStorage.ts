@@ -62,17 +62,18 @@ export class NodeStorage{
 
     async setItem(key:string, value:Uint8Array) {
         await this.checkAuth()
-        const da = await fetch('/api/write', {
+        const filePath = Buffer.from(key, 'utf-8').toString('hex')
+        const da = await fetch(`/api/write?file=${encodeURIComponent(filePath)}`, {
             method: "POST",
             body: value as any,
             headers: {
                 'content-type': 'application/octet-stream',
-                'file-path': Buffer.from(key, 'utf-8').toString('hex'),
+                'file-path': filePath,
                 'risu-auth': await this.createAuth()
             }
         })
         if(da.status < 200 || da.status >= 300){
-            throw "setItem Error"
+            throw `setItem Error: ${await da.text().catch(() => da.statusText)}`
         }
         const data = await da.json()
         if(data.error){
@@ -81,15 +82,16 @@ export class NodeStorage{
     }
     async getItem(key:string):Promise<Buffer> {
         await this.checkAuth()
-        const da = await fetch('/api/read', {
+        const filePath = Buffer.from(key, 'utf-8').toString('hex')
+        const da = await fetch(`/api/read?file=${encodeURIComponent(filePath)}`, {
             method: "GET",
             headers: {
-                'file-path': Buffer.from(key, 'utf-8').toString('hex'),
+                'file-path': filePath,
                 'risu-auth': await this.createAuth()
             }
         })
         if(da.status < 200 || da.status >= 300){
-            throw "getItem Error"
+            throw `getItem Error: ${await da.text().catch(() => da.statusText)}`
         }
 
         const data = Buffer.from(await da.arrayBuffer())
@@ -117,15 +119,16 @@ export class NodeStorage{
     }
     async removeItem(key:string){
         await this.checkAuth()
-        const da = await fetch('/api/remove', {
+        const filePath = Buffer.from(key, 'utf-8').toString('hex')
+        const da = await fetch(`/api/remove?file=${encodeURIComponent(filePath)}`, {
             method: "GET",
             headers: {
-                'file-path': Buffer.from(key, 'utf-8').toString('hex'),
+                'file-path': filePath,
                 'risu-auth': await this.createAuth()
             }
         })
         if(da.status < 200 || da.status >= 300){
-            throw "removeItem Error"
+            throw `removeItem Error: ${await da.text().catch(() => da.statusText)}`
         }
         const data = await da.json()
         if(data.error){
