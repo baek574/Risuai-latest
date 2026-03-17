@@ -575,9 +575,9 @@ app.get('/api/read', async (req, res, next) => {
     if(!await checkAuth(req, res)){
         return;
     }
-    const filePath = req.headers['file-path'];
+    const filePath = req.headers['file-path'] || req.query.file;
     if (!filePath) {
-        console.log('no path')
+        console.log('no path (header and query both missing)')
         res.status(400).send({
             error:'File path required'
         });
@@ -607,7 +607,7 @@ app.get('/api/remove', async (req, res, next) => {
     if(!await checkAuth(req, res)){
         return;
     }
-    const filePath = req.headers['file-path'];
+    const filePath = req.headers['file-path'] || req.query.file;
     if (!filePath) {
         res.status(400).send({
             error:'File path required'
@@ -652,7 +652,7 @@ app.post('/api/write', async (req, res, next) => {
     if(!await checkAuth(req, res)){
         return;
     }
-    const filePath = req.headers['file-path'];
+    const filePath = req.headers['file-path'] || req.query.file;
     const fileContent = req.body
     if (!filePath || !fileContent) {
         res.status(400).send({
