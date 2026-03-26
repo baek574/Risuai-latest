@@ -602,6 +602,7 @@ export const languageVietnamese = {
     "username": "Tên của bạn",
     "userIcon": "Biểu tượng của bạn",
     "successExport": "Đã xuất thành công và tải xuống thư mục tải xuống của bạn",
+    "successExportPartial": "Xuất hoàn tất, nhưng một số cuộc trò chuyện bị lỗi đã bị bỏ qua (xem dataset-export-skipped.txt)",
     "successImport": "Đã nhập thành công",
     "importedCharacter": "Ký tự đã nhập",
     "alwaysActive": "Luôn luôn hoạt động",

@@ -602,6 +602,7 @@ export const languageGerman = {
     "username": "Ihr Name",
     "userIcon": "Ihr Icon",
     "successExport": "Erfolgreich exportiert und in Ihrem Download-Verzeichnis gespeichert",
+    "successExportPartial": "Export abgeschlossen, aber einige fehlerhafte Chats wurden übersprungen (siehe dataset-export-skipped.txt)",
     "successImport": "Erfolgreich importiert",
     "importedCharacter": "Importierter Charakter",
     "alwaysActive": "Immer aktiv",

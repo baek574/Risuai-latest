@@ -602,6 +602,7 @@ export const languageChinese = {
     "username": "你的名称",
     "userIcon": "你的头像",
     "successExport": "已成功导出并保存至你的下载数据夹",
+    "successExportPartial": "导出完成，但跳过了部分损坏的对话（详见 dataset-export-skipped.txt）",
     "successImport": "成功导入",
     "importedCharacter": "导入角色",
     "alwaysActive": "始终激活",

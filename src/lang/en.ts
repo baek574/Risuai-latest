@@ -698,6 +698,7 @@ export const languageEnglish = {
     username: "Your Name",
     userIcon: "Your Icon",
     successExport: "Successfuly exported and downloaded to your download directory",
+    successExportPartial: "Export complete, but some broken chats were skipped (see dataset-export-skipped.txt)",
     successImport: "Successfuly imported",
     importedCharacter: "Imported Character",
     alwaysActive: "Always Active",

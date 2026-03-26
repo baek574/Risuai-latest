@@ -602,6 +602,7 @@ export const languageSpanish = {
     "username": "Tu Nombre",
     "userIcon": "Tu Icono",
     "successExport": "Exportado y descargado exitosamente en tu directorio de descargas",
+    "successExportPartial": "Exportación completada, pero se omitieron algunos chats corruptos (ver dataset-export-skipped.txt)",
     "successImport": "Importado exitosamente",
     "importedCharacter": "Personaje Importado",
     "alwaysActive": "Siempre Activo",

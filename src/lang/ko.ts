@@ -602,6 +602,7 @@ export const languageKorean = {
     "username": "유저 이름",
     "userIcon": "유저 아이콘",
     "successExport": "성공적으로 엑스포트하여 다운로드 경로에 다운로드했습니다.",
+    "successExportPartial": "일부 채팅을 건너뛰고 엑스포트를 완료했습니다. (dataset-export-skipped.txt 참조)",
     "successImport": "성공적으로 임포트했습니다.",
     "importedCharacter": "성공적으로 임포트 됨.",
     "alwaysActive": "언제나 활성화",
