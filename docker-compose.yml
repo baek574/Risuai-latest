@@ -6,6 +6,6 @@ services:
     build: .
     restart: always
     ports:
-      - 6003:6001
+      - 6001:6001
     volumes:
       - /volume1/docker/risu-latest:/app/save
