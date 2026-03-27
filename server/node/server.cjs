@@ -60,6 +60,18 @@ const authRouteLimiter = rateLimit({
     legacyHeaders: false,
     message: { error: 'Too many requests. Please retry shortly.' }
 });
+// Dedicated limiter for local file-storage CRUD endpoints (/api/read, /api/write,
+// /api/list, /api/remove).  Local backup operations read every asset file in a
+// tight loop and can easily burst past the general 90 req/min ceiling, causing
+// repeated 429s and a failed backup.  This limiter is intentionally more generous
+// while still providing a basic safety net.
+const storageRouteLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 600,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many storage requests. Please retry shortly.' }
+});
 const loginRouteLimiter = rateLimit({
     windowMs: 30 * 1000,
     max: 10,
@@ -1170,7 +1182,7 @@ app.post('/api/set_password', async (req, res) => {
     }
 })
 
-app.get('/api/read', authRouteLimiter, async (req, res, next) => {
+app.get('/api/read', storageRouteLimiter, async (req, res, next) => {
     if(!await checkAuth(req, res)){
         return;
     }
@@ -1202,7 +1214,7 @@ app.get('/api/read', authRouteLimiter, async (req, res, next) => {
     }
 });
 
-app.get('/api/remove', authRouteLimiter, async (req, res, next) => {
+app.get('/api/remove', storageRouteLimiter, async (req, res, next) => {
     if(!await checkAuth(req, res)){
         return;
     }
@@ -1230,7 +1242,7 @@ app.get('/api/remove', authRouteLimiter, async (req, res, next) => {
     }
 });
 
-app.get('/api/list', authRouteLimiter, async (req, res, next) => {
+app.get('/api/list', storageRouteLimiter, async (req, res, next) => {
     if(!await checkAuth(req, res)){
         return;
     }
@@ -1247,7 +1259,7 @@ app.get('/api/list', authRouteLimiter, async (req, res, next) => {
     }
 });
 
-app.post('/api/write', authRouteLimiter, async (req, res, next) => {
+app.post('/api/write', storageRouteLimiter, async (req, res, next) => {
     if(!await checkAuth(req, res)){
         return;
     }

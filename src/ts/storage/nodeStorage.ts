@@ -2,6 +2,47 @@ import { language } from "src/lang"
 import { alertError, alertInput, waitAlert } from "../alert"
 import { base64url, getKeypairStore, saveKeypairStore } from "../util"
 
+/**
+ * Performs a fetch with bounded exponential-backoff retries for 429 and
+ * transient 5xx responses.  Respects the `Retry-After` header when present.
+ *
+ * Local backup operations issue many sequential storage requests and can
+ * temporarily exceed the server's rate-limit window, so we retry rather than
+ * surfacing an immediate error to the user.
+ */
+async function fetchWithRetry(
+    input: RequestInfo | URL,
+    init?: RequestInit,
+    maxRetries = 5
+): Promise<Response> {
+    // Guaranteed to be assigned on the first iteration (attempt 0).
+    let lastResponse: Response = null!
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const res = await fetch(input, init)
+        if (res.status !== 429 && !(res.status >= 500 && res.status < 600)) {
+            return res
+        }
+        lastResponse = res
+        if (attempt === maxRetries) {
+            break
+        }
+        // Honor the server's Retry-After hint when present; fall back to
+        // exponential backoff (1 s, 2 s, 4 s, …, capped at 30 s).
+        const retryAfter = res.headers.get('Retry-After')
+        const delayMs = retryAfter && isFinite(parseFloat(retryAfter))
+            ? Math.max(parseFloat(retryAfter) * 1000, 500)
+            : Math.min(1000 * Math.pow(2, attempt), 30000)
+        await new Promise<void>(resolve => setTimeout(resolve, delayMs))
+    }
+    return lastResponse
+}
+
+/** Builds a descriptive error string that includes the HTTP status and body. */
+async function buildStorageError(operation: string, res: Response): Promise<string> {
+    let detail = ''
+    try { detail = await res.text() } catch {}
+    return `${operation} Error (HTTP ${res.status}${detail ? ': ' + detail : ''})`
+}
 
 export class NodeStorage{
 
@@ -71,7 +112,7 @@ export class NodeStorage{
 
     async setItem(key:string, value:Uint8Array) {
         await this.checkAuth()
-        const da = await fetch('/api/write', {
+        const da = await fetchWithRetry('/api/write', {
             method: "POST",
             body: value as any,
             headers: {
@@ -81,7 +122,7 @@ export class NodeStorage{
             }
         })
         if(da.status < 200 || da.status >= 300){
-            throw "setItem Error"
+            throw await buildStorageError('setItem', da)
         }
         const data = await da.json()
         if(data.error){
@@ -90,7 +131,7 @@ export class NodeStorage{
     }
     async getItem(key:string):Promise<Buffer> {
         await this.checkAuth()
-        const da = await fetch('/api/read', {
+        const da = await fetchWithRetry('/api/read', {
             method: "GET",
             headers: {
                 'file-path': Buffer.from(key, 'utf-8').toString('hex'),
@@ -98,7 +139,7 @@ export class NodeStorage{
             }
         })
         if(da.status < 200 || da.status >= 300){
-            throw "getItem Error"
+            throw await buildStorageError('getItem', da)
         }
 
         const data = Buffer.from(await da.arrayBuffer())
@@ -109,14 +150,14 @@ export class NodeStorage{
     }
     async keys():Promise<string[]>{
         await this.checkAuth()
-        const da = await fetch('/api/list', {
+        const da = await fetchWithRetry('/api/list', {
             method: "GET",
             headers:{
                 'risu-auth': await this.createAuth()
             }
         })
         if(da.status < 200 || da.status >= 300){
-            throw "listItem Error"
+            throw await buildStorageError('listItem', da)
         }
         const data = await da.json()
         if(data.error){
@@ -126,7 +167,7 @@ export class NodeStorage{
     }
     async removeItem(key:string){
         await this.checkAuth()
-        const da = await fetch('/api/remove', {
+        const da = await fetchWithRetry('/api/remove', {
             method: "GET",
             headers: {
                 'file-path': Buffer.from(key, 'utf-8').toString('hex'),
@@ -134,7 +175,7 @@ export class NodeStorage{
             }
         })
         if(da.status < 200 || da.status >= 300){
-            throw "removeItem Error"
+            throw await buildStorageError('removeItem', da)
         }
         const data = await da.json()
         if(data.error){
