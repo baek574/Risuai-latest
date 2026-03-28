@@ -53,25 +53,6 @@ const authenticatedRouteLimiter = rateLimit({
     legacyHeaders: false,
     message: { error: 'Too many requests. Please retry shortly.' }
 });
-const authRouteLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 90,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Too many requests. Please retry shortly.' }
-});
-// Dedicated limiter for local file-storage CRUD endpoints (/api/read, /api/write,
-// /api/list, /api/remove).  Local backup operations read every asset file in a
-// tight loop and can easily burst past the general 90 req/min ceiling, causing
-// repeated 429s and a failed backup.  This limiter is intentionally more generous
-// while still providing a basic safety net.
-const storageRouteLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 600,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Too many storage requests. Please retry shortly.' }
-});
 const loginRouteLimiter = rateLimit({
     windowMs: 30 * 1000,
     max: 10,
@@ -1133,7 +1114,11 @@ app.delete('/proxy-stream-jobs/:jobId', authenticatedRouteLimiter, async (req, r
 //     }
 // })
 
-app.get('/api/test_auth', authRouteLimiter, async(req, res) => {
+// Storage-flow auth probe: not rate-limited because NodeStorage (client-side) caches
+// the result after the first successful check and will not call this endpoint again
+// until the page is reloaded.  Removing the limit prevents rare edge-case 429s during
+// session startup without weakening login brute-force protection (/api/login below).
+app.get('/api/test_auth', async(req, res) => {
 
     if(!password){
         res.send({status: 'unset'})
@@ -1182,7 +1167,10 @@ app.post('/api/set_password', async (req, res) => {
     }
 })
 
-app.get('/api/read', storageRouteLimiter, async (req, res, next) => {
+// Storage endpoints are intentionally not rate-limited: personal backup/delete
+// operations legitimately generate thousands of sequential requests and must not
+// be throttled.  Auth checks are preserved on every route below.
+app.get('/api/read', async (req, res, next) => {
     if(!await checkAuth(req, res)){
         return;
     }
@@ -1214,7 +1202,7 @@ app.get('/api/read', storageRouteLimiter, async (req, res, next) => {
     }
 });
 
-app.get('/api/remove', storageRouteLimiter, async (req, res, next) => {
+app.get('/api/remove', async (req, res, next) => {
     if(!await checkAuth(req, res)){
         return;
     }
@@ -1242,7 +1230,7 @@ app.get('/api/remove', storageRouteLimiter, async (req, res, next) => {
     }
 });
 
-app.get('/api/list', storageRouteLimiter, async (req, res, next) => {
+app.get('/api/list', async (req, res, next) => {
     if(!await checkAuth(req, res)){
         return;
     }
@@ -1259,7 +1247,7 @@ app.get('/api/list', storageRouteLimiter, async (req, res, next) => {
     }
 });
 
-app.post('/api/write', storageRouteLimiter, async (req, res, next) => {
+app.post('/api/write', async (req, res, next) => {
     if(!await checkAuth(req, res)){
         return;
     }
